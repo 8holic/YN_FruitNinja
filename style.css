@@ -1,6 +1,8 @@
-html, body { margin: 0; height: 100%; overflow: hidden; background: #161622; overscroll-behavior: none; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0b12; overscroll-behavior: none; }
 
 body {
+  display: grid;
+  place-items: center;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -8,10 +10,36 @@ body {
   font-family: system-ui, sans-serif;
 }
 
-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#stage {
+  position: relative;
+  width: min(92vw, 69vh);
+  width: min(92vw, 69dvh);
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 2.5vmin;
+  background: #1b1b2b;
+  box-shadow: 0 0 0 1px #ffffff14, 0 10px 40px #0008;
+}
+
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+#flash {
+  position: absolute;
+  inset: 0;
+  background: #f33;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#flash.on { animation: flash 250ms ease-out; }
+
+@keyframes flash {
+  from { opacity: .3; }
+  to { opacity: 0; }
+}
 
 #hud {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
@@ -26,7 +54,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 }
 
 #overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: grid;
   place-content: center;
