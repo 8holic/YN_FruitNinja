@@ -1,18 +1,33 @@
 (() => {
   'use strict';
 
-  const DURATION = 60;
-  const EMOJI = ['🍉', '🍊', '🍎', '🥝', '🍋', '🍇', '🍓'];
-  const SLASH_AUDIO = [
-    'assets/mp3/cut-through-the-air.mp3',
-    'assets/mp3/slashed-with-a-sword-and-gushing-blood.mp3',
-    'assets/mp3/strong-swing-and-cut-in-half.mp3'
-  ].map(src => {
+  const CFG = window.CONFIG;
+  const DURATION = CFG.duration;
+  const params = new URLSearchParams(location.search);
+  const SWORD = params.has('sword');
+  const SWORD_SENS = Math.max(0.1, Math.min(2, Number(params.get('sens')) || CFG.sword.sensitivity));
+  const SWAP_AXES = params.has('swap');
+  const sprites = {};
+
+  for (const [kind, src] of Object.entries(CFG.assets.sprites)) {
+    const img = new Image();
+    img.onload = () => {
+      const scale = CFG.assets.spriteMaxSize / Math.max(img.width, img.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      sprites[kind] = canvas;
+    };
+    img.src = src;
+  }
+
+  const SLASH_AUDIO = CFG.assets.slashAudio.map(src => {
     const audio = new Audio(src);
     audio.preload = 'auto';
     return audio;
   });
-  const EXPLOSION_AUDIO = new Audio('assets/mp3/explosion.mp3');
+  const EXPLOSION_AUDIO = new Audio(CFG.assets.explosionAudio);
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -20,6 +35,11 @@
   const scoreEl = document.getElementById('score');
   const overlay = document.getElementById('overlay');
   const flashEl = document.getElementById('flash');
+
+  if (SWORD) {
+    document.body.classList.add('sword');
+    overlay.querySelector('small').textContent = 'Move to slice · click to recenter';
+  }
 
   let W = 0, H = 0;
   let fruits = [];
@@ -33,6 +53,9 @@
   let spawnIn = 0;
   let lastFrame = 0;
   let lastPoint = null;
+  let blade = { x: 0, y: 0 };
+  let bladeJump = true;
+  let bladeVisible = true;
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -43,29 +66,31 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     fruits = [];
     halves = [];
+    blade = { x: W / 2, y: H / 2 };
   }
 
   function spawn() {
-    const r = Math.min(W, H) * 0.08;
-    const isBomb = timeLeft <= 50 && Math.random() < 0.18;
-    const isHigh = !isBomb && Math.random() < 0.1;
+    const r = Math.min(W, H) * CFG.physics.radius;
+    const isBomb = timeLeft <= CFG.spawn.bombAfterSeconds && Math.random() < CFG.spawn.bombChance;
+    const isHigh = !isBomb && Math.random() < CFG.spawn.highChance;
+    const kind = isBomb ? 'bomb' : isHigh ? 'high' : 'fruit';
 
     fruits.push({
       x: r + Math.random() * (W - 2 * r),
       y: H + r,
-      vx: (Math.random() - 0.5) * W * 0.44,
-      vy: -H * (0.9 + Math.random() * 0.7),
+      vx: (Math.random() - 0.5) * W * CFG.physics.drift,
+      vy: -H * (CFG.physics.launchMin + Math.random() * CFG.physics.launchRandom),
       r,
       rot: Math.random() * Math.PI * 2,
-      spin: (Math.random() - 0.5) * 2,
-      emoji: isBomb ? '💣' : isHigh ? '💎' : EMOJI[(Math.random() * EMOJI.length) | 0],
+      spin: (Math.random() - 0.5) * CFG.physics.spin,
+      sprite: kind,
       bomb: isBomb,
-      points: isBomb ? -9 : isHigh ? 12 : 6
+      points: isBomb ? CFG.points.bomb : isHigh ? CFG.points.high : CFG.points.fruit
     });
   }
 
   function move(p, dt) {
-    p.vy += H * 1.5 * dt;
+    p.vy += H * CFG.physics.gravity * dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.rot += p.spin * dt;
@@ -78,9 +103,9 @@
   function update(dt) {
     spawnIn -= dt;
     if (spawnIn <= 0) {
-      const wave = timeLeft <= 25 ? 3 : timeLeft <= 50 ? 2 : 1;
+      const wave = timeLeft <= CFG.spawn.wave3At ? 3 : timeLeft <= CFG.spawn.wave2At ? 2 : 1;
       for (let i = 0; i < wave; i++) spawn();
-      spawnIn = 0.45 + Math.random() * 0.25;
+      spawnIn = CFG.spawn.intervalMin + Math.random() * (CFG.spawn.intervalMax - CFG.spawn.intervalMin);
     }
 
     for (const f of fruits) move(f, dt);
@@ -104,7 +129,7 @@
   function split(f, angle) {
     const nx = -Math.sin(angle);
     const ny = Math.cos(angle);
-    const speed = H * (0.35 + Math.random() * 0.15);
+    const speed = H * (CFG.physics.separationSpeed + Math.random() * CFG.physics.separationRandom);
     const offset = f.r * 0.1;
 
     for (const side of [1, -1]) {
@@ -115,10 +140,10 @@
         vy: f.vy + ny * speed * side,
         r: f.r,
         rot: f.rot,
-        spin: (Math.random() - 0.5) * 4,
+        spin: (Math.random() - 0.5) * CFG.physics.separationSpin,
         cutLocal: angle - f.rot,
         side,
-        emoji: f.emoji
+        sprite: f.sprite
       });
     }
   }
@@ -150,7 +175,7 @@
           flashScreen();
           playSound(EXPLOSION_AUDIO);
         } else {
-          if (now - lastHitAt > 400) slashHits = 0;
+          if (now - lastHitAt > CFG.combo.windowMs) slashHits = 0;
           slashHits++;
           lastHitAt = now;
           score += f.points * slashHits;
@@ -179,15 +204,18 @@
       ctx.rotate(-f.cutLocal);
     }
 
-    ctx.font = `${f.r * 2}px serif`;
-    ctx.fillText(f.emoji, 0, 0);
+    const sprite = sprites[f.sprite];
+    if (sprite) {
+      const scale = (f.r * 2) / Math.max(sprite.width, sprite.height);
+      const w = sprite.width * scale;
+      const h = sprite.height * scale;
+      ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+    }
     ctx.restore();
   }
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
 
     for (const f of fruits) drawFruit(f, false);
     for (const h of halves) drawFruit(h, true);
@@ -202,6 +230,13 @@
       for (let i = 1; i < trail.length; i++) ctx.lineTo(trail[i].x, trail[i].y);
       ctx.stroke();
     }
+
+    if (SWORD && state === 'playing' && bladeVisible) {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(blade.x, blade.y, Math.min(W, H) * 0.01, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function start() {
@@ -214,7 +249,11 @@
     trail = [];
     spawnIn = 0;
     lastPoint = null;
+    blade = { x: W / 2, y: H / 2 };
+    bladeJump = true;
+    bladeVisible = true;
     overlay.classList.add('hidden');
+    if (SWORD) canvas.requestPointerLock()?.catch?.(() => {});
   }
 
   function end() {
@@ -223,6 +262,7 @@
     halves = [];
     trail = [];
     lastPoint = null;
+    if (document.pointerLockElement) document.exitPointerLock();
     overlay.innerHTML = `Time!<small>Score ${score} · tap to play again</small>`;
     overlay.classList.remove('hidden');
   }
@@ -253,16 +293,70 @@
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
+  function limitStep(x, y) {
+    const max = Math.min(W, H) * CFG.sword.maxStep;
+    const dist = Math.hypot(x, y);
+    return dist > max ? { x: (x / dist) * max, y: (y / dist) * max } : { x, y };
+  }
+
   window.addEventListener('pointerdown', e => {
+    if (SWORD && document.pointerLockElement === canvas) {
+      blade = { x: W / 2, y: H / 2 };
+      trail = [];
+      bladeVisible = true;
+      return;
+    }
+    if (SWORD && state === 'playing') canvas.requestPointerLock()?.catch?.(() => {});
     if (state === 'ready') start();
     else if (state === 'over') { location.reload(); return; }
     slashHits = 0;
     lastPoint = localPoint(e);
     trail = [{ ...lastPoint, t: performance.now() }];
+    if (!SWORD) canvas.setPointerCapture?.(e.pointerId);
   });
 
   window.addEventListener('pointermove', e => {
-    if (state !== 'playing' || !lastPoint) return;
+    if (state !== 'playing') return;
+
+    if (SWORD) {
+      if (document.pointerLockElement === canvas) {
+        const rawX = (SWAP_AXES ? e.movementY : e.movementX) * SWORD_SENS;
+        const rawY = (SWAP_AXES ? e.movementX : e.movementY) * SWORD_SENS;
+        const step = limitStep(rawX, rawY);
+        const x = blade.x + step.x;
+        const y = blade.y + step.y;
+        const inside = x >= 0 && x <= W && y >= 0 && y <= H;
+
+        if (inside) {
+          trail.push({ x, y, t: performance.now() });
+          slice(blade.x, blade.y, x, y);
+          bladeVisible = true;
+        } else {
+          trail = [];
+          bladeVisible = false;
+        }
+
+        blade = { x, y };
+      } else {
+        const p = localPoint(e);
+        if (bladeJump) {
+          blade = p;
+          bladeJump = false;
+          bladeVisible = true;
+          return;
+        }
+        const step = limitStep(p.x - blade.x, p.y - blade.y);
+        const x = blade.x + step.x;
+        const y = blade.y + step.y;
+        trail.push({ x, y, t: performance.now() });
+        slice(blade.x, blade.y, x, y);
+        blade = { x, y };
+        bladeVisible = true;
+      }
+      return;
+    }
+
+    if (!lastPoint) return;
     const p = localPoint(e);
     trail.push({ ...p, t: performance.now() });
     slice(lastPoint.x, lastPoint.y, p.x, p.y);
@@ -270,9 +364,25 @@
   });
 
   const release = () => { lastPoint = null; };
+  const loseFocus = () => {
+    lastPoint = null;
+    bladeJump = true;
+    bladeVisible = false;
+  };
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
+  window.addEventListener('blur', loseFocus);
+  document.addEventListener('mouseleave', loseFocus);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) loseFocus();
+  });
   window.addEventListener('resize', resize);
+  document.addEventListener('pointerlockchange', () => {
+    lastPoint = null;
+    trail = [];
+    bladeJump = true;
+    bladeVisible = true;
+  });
 
   console.assert(segmentHitsCircle(0, 0, 100, 0, 50, 10, 20), 'segment should hit circle');
   console.assert(!segmentHitsCircle(0, 0, 100, 0, 50, 40, 20), 'segment should miss circle');
