@@ -19,9 +19,10 @@ body {
 
 #stage {
   position: relative;
-  width: min(96vw, 72vh);
-  width: min(96vw, 72dvh);
-  aspect-ratio: 3 / 4;
+  height: 80vh;
+  height: 80dvh;
+  width: min(96vw, 80vh);
+  width: min(96vw, 80dvh);
   overflow: hidden;
   isolation: isolate;
   border-radius: 2.5vmin;
