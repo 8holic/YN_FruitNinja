@@ -1,7 +1,9 @@
+import { CONFIG } from './config.js';
+
 (() => {
   'use strict';
 
-  const CFG = window.CONFIG;
+  const CFG = CONFIG;
   const DURATION = CFG.duration;
   const params = new URLSearchParams(location.search);
   const SWORD = params.has('sword');
@@ -35,6 +37,22 @@
   const scoreEl = document.getElementById('score');
   const overlay = document.getElementById('overlay');
   const flashEl = document.getElementById('flash');
+  const board = document.getElementById('board');
+  const boardScores = document.getElementById('scores');
+  const finalScoreEl = document.getElementById('final-score');
+  const scoreForm = document.getElementById('score-form');
+  const submitScoreBtn = document.getElementById('submit-score');
+  const nameInput = document.getElementById('player-name');
+  const boardStatus = document.getElementById('board-status');
+  const playAgainBtn = document.getElementById('play-again');
+
+  nameInput.value = localStorage.getItem('fruit-name') || '';
+
+  let firebaseApi;
+  function loadFirebase() {
+    firebaseApi ??= import('./firebase.js');
+    return firebaseApi;
+  }
 
   if (SWORD) {
     document.body.classList.add('sword');
@@ -69,24 +87,37 @@
     blade = { x: W / 2, y: H / 2 };
   }
 
-  function spawn() {
+  function spawnWave() {
     const r = Math.min(W, H) * CFG.physics.radius;
-    const isBomb = timeLeft <= CFG.spawn.bombAfterSeconds && Math.random() < CFG.spawn.bombChance;
-    const isHigh = !isBomb && Math.random() < CFG.spawn.highChance;
-    const kind = isBomb ? 'bomb' : isHigh ? 'high' : 'fruit';
+    const base = timeLeft <= CFG.spawn.wave4At ? 4
+      : timeLeft <= CFG.spawn.wave3At ? 3
+      : timeLeft <= CFG.spawn.wave2At ? 2 : 1;
+    const count = base + (Math.random() < 0.5 ? 0 : 1);
+    const vx = (Math.random() - 0.5) * W * CFG.physics.drift;
+    const vy = -H * (CFG.physics.launchMin + Math.random() * CFG.physics.launchRandom);
+    const spacing = r * 2.4;
+    const usable = W - 2 * r;
+    const groupWidth = Math.min(usable, (count - 1) * spacing);
+    const startX = r + Math.random() * Math.max(0, usable - groupWidth);
+    const step = count > 1 ? groupWidth / (count - 1) : 0;
 
-    fruits.push({
-      x: r + Math.random() * (W - 2 * r),
-      y: H + r,
-      vx: (Math.random() - 0.5) * W * CFG.physics.drift,
-      vy: -H * (CFG.physics.launchMin + Math.random() * CFG.physics.launchRandom),
-      r,
-      rot: Math.random() * Math.PI * 2,
-      spin: (Math.random() - 0.5) * CFG.physics.spin,
-      sprite: kind,
-      bomb: isBomb,
-      points: isBomb ? CFG.points.bomb : isHigh ? CFG.points.high : CFG.points.fruit
-    });
+    for (let i = 0; i < count; i++) {
+      const isBomb = timeLeft <= CFG.spawn.bombAfterSeconds && Math.random() < CFG.spawn.bombChance;
+      const isHigh = !isBomb && Math.random() < CFG.spawn.highChance;
+
+      fruits.push({
+        x: startX + step * i,
+        y: H + r,
+        vx,
+        vy,
+        r,
+        rot: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * CFG.physics.spin,
+        sprite: isBomb ? 'bomb' : isHigh ? 'high' : 'fruit',
+        bomb: isBomb,
+        points: isBomb ? CFG.points.bomb : isHigh ? CFG.points.high : CFG.points.fruit
+      });
+    }
   }
 
   function move(p, dt) {
@@ -103,8 +134,7 @@
   function update(dt) {
     spawnIn -= dt;
     if (spawnIn <= 0) {
-      const wave = timeLeft <= CFG.spawn.wave3At ? 3 : timeLeft <= CFG.spawn.wave2At ? 2 : 1;
-      for (let i = 0; i < wave; i++) spawn();
+      spawnWave();
       spawnIn = CFG.spawn.intervalMin + Math.random() * (CFG.spawn.intervalMax - CFG.spawn.intervalMin);
     }
 
@@ -263,9 +293,70 @@
     trail = [];
     lastPoint = null;
     if (document.pointerLockElement) document.exitPointerLock();
-    overlay.innerHTML = `Time!<small>Score ${score} · tap to play again</small>`;
-    overlay.classList.remove('hidden');
+    showBoard();
   }
+
+  async function renderScores() {
+    boardScores.innerHTML = '';
+
+    try {
+      const { getTopScores } = await loadFirebase();
+      const scores = await getTopScores();
+
+      if (!scores.length) {
+        const empty = document.createElement('li');
+        empty.className = 'empty';
+        empty.textContent = 'No scores yet';
+        boardScores.append(empty);
+        return;
+      }
+
+      scores.forEach((entry, index) => {
+        const li = document.createElement('li');
+        const rank = document.createElement('span');
+        const who = document.createElement('span');
+        const points = document.createElement('span');
+        rank.textContent = `${index + 1}.`;
+        who.textContent = entry.name;
+        points.textContent = entry.score;
+        li.append(rank, who, points);
+        boardScores.append(li);
+      });
+    } catch {
+      boardStatus.textContent = 'Leaderboard unavailable.';
+    }
+  }
+
+  function showBoard() {
+    overlay.classList.add('hidden');
+    finalScoreEl.textContent = score;
+    boardStatus.textContent = '';
+    submitScoreBtn.disabled = false;
+    board.classList.remove('hidden');
+    renderScores();
+  }
+
+  scoreForm.addEventListener('submit', async event => {
+    event.preventDefault();
+
+    const name = nameInput.value.trim().slice(0, 16) || 'Player';
+    nameInput.value = name;
+    localStorage.setItem('fruit-name', name);
+    submitScoreBtn.disabled = true;
+    boardStatus.textContent = 'Saving...';
+
+    try {
+      const { submitScore } = await loadFirebase();
+      const result = await submitScore(name, score);
+      boardStatus.textContent = result.saved ? 'Saved.' : `Best so far: ${result.best}.`;
+      renderScores();
+    } catch {
+      boardStatus.textContent = 'Could not save.';
+      submitScoreBtn.disabled = false;
+    }
+  });
+
+  playAgainBtn.addEventListener('click', () => location.reload());
 
   function frame(now) {
     const dt = lastFrame ? Math.min((now - lastFrame) / 1000, 0.05) : 0;
@@ -308,7 +399,7 @@
     }
     if (SWORD && state === 'playing') canvas.requestPointerLock()?.catch?.(() => {});
     if (state === 'ready') start();
-    else if (state === 'over') { location.reload(); return; }
+    else if (state === 'over') return;
     slashHits = 0;
     lastPoint = localPoint(e);
     trail = [{ ...lastPoint, t: performance.now() }];

@@ -1,5 +1,14 @@
-window.CONFIG = {
+export const CONFIG = {
   duration: 60,
+
+  firebase: {
+    apiKey: 'AIzaSyCdbK0OqFeUTRlUJyng-6KWvBMPIUleL7Q',
+    authDomain: 'yn-fruitninja-db.firebaseapp.com',
+    projectId: 'yn-fruitninja-db',
+    storageBucket: 'yn-fruitninja-db.firebasestorage.app',
+    messagingSenderId: '37244823311',
+    appId: '1:37244823311:web:21d3a7efd3cd35394c807a'
+  },
 
   points: {
     fruit: 6,
@@ -17,6 +26,7 @@ window.CONFIG = {
     highChance: 0.1,
     wave2At: 50,
     wave3At: 25,
+    wave4At: 15,
     intervalMin: 0.45,
     intervalMax: 0.7
   },

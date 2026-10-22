@@ -88,3 +88,94 @@ body.sword #stage {
 #overlay small img { height: 1.1em; vertical-align: -0.18em; }
 
 #overlay.hidden { display: none; }
+
+#board {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  box-sizing: border-box;
+  padding: 4vmin;
+  overflow-y: auto;
+  color: #fff;
+  background: #000b;
+  touch-action: pan-y;
+}
+
+#board.hidden { display: none; }
+
+#board .panel {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2vmin;
+  text-align: center;
+}
+
+.board-title { font-size: 7vmin; font-weight: 800; }
+.board-score { font-size: 4.5vmin; font-weight: 600; }
+.board-score span { font-variant-numeric: tabular-nums; }
+
+#score-form { display: flex; gap: 2vmin; }
+
+#player-name {
+  flex: 1;
+  min-width: 0;
+  padding: 2vmin;
+  border: 0;
+  border-radius: 1.2vmin;
+  font: inherit;
+  font-size: max(16px, 3.8vmin);
+  background: #fff;
+  color: #161622;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#player-name:focus { outline: 2px solid #ff8a1f; }
+
+#submit-score, #play-again {
+  padding: 2vmin 3vmin;
+  border: 0;
+  border-radius: 1.2vmin;
+  font: inherit;
+  font-size: max(16px, 3.8vmin);
+  font-weight: 700;
+  background: #ff8a1f;
+  color: #161622;
+}
+
+#play-again { background: #fff; }
+
+#submit-score:disabled { opacity: .5; }
+
+#board-status {
+  min-height: 1.2em;
+  margin: 0;
+  font-size: 3.4vmin;
+  opacity: .8;
+}
+
+#scores {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 3.8vmin;
+}
+
+#scores li {
+  display: grid;
+  grid-template-columns: 2.5em 1fr auto;
+  gap: 1.5vmin;
+  padding: 1vmin 0;
+  border-bottom: 1px solid #ffffff16;
+  text-align: left;
+}
+
+#scores li span:last-child { font-variant-numeric: tabular-nums; }
+
+#scores li.empty {
+  display: block;
+  text-align: center;
+  opacity: .6;
+}

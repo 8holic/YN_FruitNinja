@@ -12,9 +12,22 @@
     <div id="flash"></div>
     <div id="hud"><span id="time">60</span><span id="score">0</span></div>
     <div id="overlay">Tap to start<small>Swipe to slice · <img src="assets/images/highpoint.png" alt="high value"> 12 · <img src="assets/images/minuspoint.png" alt="bomb"> −9</small></div>
+
+    <div id="board" class="hidden">
+      <div class="panel">
+        <div class="board-title">Time!</div>
+        <div class="board-score">Score <span id="final-score">0</span></div>
+        <form id="score-form">
+          <input id="player-name" type="text" maxlength="16" placeholder="Your name" autocomplete="nickname">
+          <button id="submit-score" type="submit">Submit</button>
+        </form>
+        <p id="board-status"></p>
+        <ol id="scores"></ol>
+        <button id="play-again" type="button">Play again</button>
+      </div>
+    </div>
   </main>
 
-  <script src="config.js"></script>
-  <script src="game.js"></script>
+  <script type="module" src="game.js"></script>
 </body>
 </html>
