@@ -55,7 +55,10 @@ import { CONFIG } from './config.js';
   const youRow = document.getElementById('you');
   const youRank = document.getElementById('you-rank');
   const youScore = document.getElementById('you-score');
+  const shareBtn = document.getElementById('share-score');
   const playAgainBtn = document.getElementById('play-again');
+
+  let shareFile = null;
 
   nameInput.value = localStorage.getItem('fruit-name') || '';
 
@@ -494,9 +497,191 @@ import { CONFIG } from './config.js';
     youScore.textContent = score;
     youRank.textContent = '-';
     youRow.classList.remove('hidden');
+
+    try {
+      shareFile = makeShareFile(score);
+    } catch {
+      shareFile = null;
+    }
+
     board.classList.remove('hidden');
     renderScores();
   }
+
+  function drawSprite(g, sprite, x, y, size, rotation, alpha) {
+    if (!sprite) return;
+    const scale = size / Math.max(sprite.width, sprite.height);
+    g.save();
+    g.globalAlpha = alpha;
+    g.translate(x, y);
+    g.rotate(rotation);
+    g.drawImage(
+      sprite,
+      -sprite.width * scale / 2,
+      -sprite.height * scale / 2,
+      sprite.width * scale,
+      sprite.height * scale
+    );
+    g.restore();
+  }
+
+  function drawScoreCard(value) {
+    const size = 1080;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const g = canvas.getContext('2d');
+
+    const bg = g.createLinearGradient(0, 0, size, size);
+    bg.addColorStop(0, '#160b0d');
+    bg.addColorStop(.55, '#2b1510');
+    bg.addColorStop(1, '#080508');
+    g.fillStyle = bg;
+    g.fillRect(0, 0, size, size);
+
+    const glow = g.createRadialGradient(size / 2, 520, 80, size / 2, 520, 650);
+    glow.addColorStop(0, 'rgba(255, 150, 70, .26)');
+    glow.addColorStop(.55, 'rgba(120, 30, 25, .2)');
+    glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    g.fillStyle = glow;
+    g.fillRect(0, 0, size, size);
+
+    const vignette = g.createRadialGradient(size / 2, size / 2, 260, size / 2, size / 2, 720);
+    vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignette.addColorStop(1, 'rgba(0, 0, 0, .78)');
+    g.fillStyle = vignette;
+    g.fillRect(0, 0, size, size);
+
+    g.strokeStyle = 'rgba(255, 179, 92, .25)';
+    g.lineWidth = 3;
+    g.strokeRect(38, 38, size - 76, size - 76);
+
+    drawSprite(g, sprites.fruit, 122, 970, 150, -0.22, .95);
+    drawSprite(g, sprites.high, 958, 980, 120, 0.18, .9);
+
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+
+    g.fillStyle = '#ffb35c';
+    g.font = '700 34px system-ui, sans-serif';
+    g.fillText('PIONEER SPOOKY NIGHT', size / 2, 140);
+
+    g.save();
+    g.shadowColor = 'rgba(255, 120, 50, .55)';
+    g.shadowBlur = 32;
+    g.fillStyle = '#fff3e0';
+    g.font = '800 82px Georgia, serif';
+    g.fillText('OLD SCHOOL', size / 2, 250);
+    g.fillText('PUMPKIN SLASHER', size / 2, 340);
+    g.restore();
+
+    g.strokeStyle = 'rgba(255, 179, 92, .4)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(size / 2 - 120, 405);
+    g.lineTo(size / 2 + 120, 405);
+    g.stroke();
+
+    g.fillStyle = '#ffb35c';
+    g.font = '700 30px system-ui, sans-serif';
+    g.fillText('SCORE', size / 2, 475);
+
+    const scoreText = String(value);
+    const scoreSize = scoreText.length > 4 ? 150 : scoreText.length === 4 ? 190 : 230;
+    g.save();
+    g.shadowColor = 'rgba(255, 100, 40, .55)';
+    g.shadowBlur = 36;
+    g.fillStyle = '#fff';
+    g.font = `900 ${scoreSize}px system-ui, sans-serif`;
+    g.fillText(scoreText, size / 2, 620);
+    g.restore();
+
+    g.fillStyle = 'rgba(255, 255, 255, .68)';
+    g.font = '600 28px system-ui, sans-serif';
+    g.fillText('OLD SCHOOL HORRORS', size / 2, 745);
+
+    g.fillStyle = '#ffb35c';
+    g.font = '600 26px system-ui, sans-serif';
+    g.fillText('#PioneerYOUth  #PioneerTogether', size / 2, 855);
+    g.fillText('#PioneerSpookyNight  #oldschoolhorrors', size / 2, 898);
+
+    return canvas;
+  }
+
+  function makeShareFile(value) {
+    const canvas = drawScoreCard(value);
+    const base64 = canvas.toDataURL('image/png').split(',')[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new File([bytes], 'pioneer-pumpkin-slasher.png', { type: 'image/png' });
+  }
+
+  function shareCaption(value) {
+    return `I got a score of ${value} at the Old School Pumpkin Slasher booth — Pioneer Spooky Night!\n#PioneerYOUth #PioneerTogether #PioneerSpookyNight #oldschoolhorrors`;
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.append(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      return copied;
+    }
+  }
+
+  async function downloadShareImage(file, caption) {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'pioneer-pumpkin-slasher.png';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+    const copied = await copyText(caption);
+    boardStatus.textContent = copied
+      ? 'Image downloaded. Caption copied — post it to Facebook.'
+      : caption;
+  }
+
+  shareBtn.addEventListener('click', async () => {
+    if (!shareFile) {
+      boardStatus.textContent = 'Share image unavailable.';
+      return;
+    }
+
+    const caption = shareCaption(score);
+    shareBtn.disabled = true;
+    boardStatus.textContent = '';
+
+    try {
+      if (navigator.share && navigator.canShare?.({ files: [shareFile] })) {
+        await navigator.share({
+          files: [shareFile],
+          text: caption,
+          title: 'Pioneer Spooky Night'
+        });
+      } else {
+        await downloadShareImage(shareFile, caption);
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        await downloadShareImage(shareFile, caption);
+      }
+    } finally {
+      shareBtn.disabled = false;
+    }
+  });
 
   scoreForm.addEventListener('submit', async event => {
     event.preventDefault();

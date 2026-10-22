@@ -277,7 +277,7 @@ body.sword #stage {
 
 #player-name:focus { outline: 2px solid #ff8a1f; }
 
-#submit-score, #play-again {
+#submit-score, #share-score, #play-again {
   padding: 2vmin 3vmin;
   border: 0;
   border-radius: 1.2vmin;
@@ -290,7 +290,7 @@ body.sword #stage {
 
 #play-again { background: #fff; }
 
-#submit-score:disabled { opacity: .5; }
+#submit-score:disabled, #share-score:disabled { opacity: .5; }
 
 #board-status {
   min-height: 1.2em;
