@@ -1,17 +1,15 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js';
 import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js';
 import {
+  addDoc,
   collection,
-  doc,
   getCountFromServer,
-  getDoc,
   getDocs,
   getFirestore,
   limit,
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
   where
 } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { CONFIG } from './config.js';
@@ -41,22 +39,13 @@ export async function submitScore(name, score) {
   if (!auth.currentUser) await signInAnonymously(auth);
 
   const uid = auth.currentUser.uid;
-  const ref = doc(db, 'scores', uid);
-  const existing = await getDoc(ref);
-  const best = existing.exists() ? existing.data().score : null;
 
-  if (best !== null && score < best) {
-    return { saved: false, best, rank: await getRank(best) };
-  }
-
-  const data = {
+  await addDoc(collection(db, 'scores'), {
     uid,
     name: name.trim().slice(0, 16) || 'Player',
     score,
-    updatedAt: serverTimestamp()
-  };
-  if (!existing.exists()) data.createdAt = serverTimestamp();
+    createdAt: serverTimestamp()
+  });
 
-  await setDoc(ref, data, { merge: true });
   return { saved: true, best: score, rank: await getRank(score) };
 }
