@@ -17,7 +17,19 @@ export const CONFIG = {
   },
 
   combo: {
-    windowMs: 400
+    max: 5,
+    slicesPerTier: 10,
+    graceMs: 1000,
+    decayMs: 4000
+  },
+
+  feedback: {
+    juiceParticles: 9,
+    bombParticles: 16,
+    particleLife: 0.65,
+    popupLife: 0.75,
+    shakeTime: 0.3,
+    shakeAmount: 0.02
   },
 
   spawn: {
@@ -27,15 +39,16 @@ export const CONFIG = {
     wave2At: 50,
     wave3At: 25,
     wave4At: 15,
-    intervalMin: 0.45,
-    intervalMax: 0.7
+    startDelay: 0.8,
+    intervalMin: 0.6,
+    intervalMax: 0.9
   },
 
   physics: {
     radius: 0.08,
     gravity: 1.5,
-    launchMin: 0.9,
-    launchRandom: 0.7,
+    apexMin: 0.5,
+    apexRange: 0.35,
     drift: 0.44,
     spin: 2,
     separationSpeed: 0.35,

@@ -30,10 +30,18 @@ import { CONFIG } from './config.js';
     return audio;
   });
   const EXPLOSION_AUDIO = new Audio(CFG.assets.explosionAudio);
+  const JUICE_COLORS = {
+    fruit: ['#ff9a2e', '#ffbf5a', '#e06b16', '#a33d12'],
+    high: ['#ffd36b', '#ff9a2e', '#ff6b2e', '#c94c14'],
+    bomb: ['#ffefd6', '#c9c4d6', '#ff4b3a', '#7a1f1f']
+  };
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const timeEl = document.getElementById('time');
+  const comboMeter = document.getElementById('combo-meter');
+  const comboFill = document.getElementById('combo-fill');
+  const comboLabel = document.getElementById('combo-label');
   const scoreEl = document.getElementById('score');
   const overlay = document.getElementById('overlay');
   const flashEl = document.getElementById('flash');
@@ -65,10 +73,14 @@ import { CONFIG } from './config.js';
   let W = 0, H = 0;
   let fruits = [];
   let halves = [];
+  let particles = [];
+  let popups = [];
+  let cutFlashes = [];
+  let shake = 0;
   let trail = [];
   let score = 0;
-  let slashHits = 0;
-  let lastHitAt = 0;
+  let comboProgress = 0;
+  let comboTimer = 0;
   let timeLeft = DURATION;
   let state = 'ready';
   let spawnIn = 0;
@@ -87,6 +99,10 @@ import { CONFIG } from './config.js';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     fruits = [];
     halves = [];
+    particles = [];
+    popups = [];
+    cutFlashes = [];
+    shake = 0;
     blade = { x: W / 2, y: H / 2 };
   }
 
@@ -96,8 +112,6 @@ import { CONFIG } from './config.js';
       : timeLeft <= CFG.spawn.wave3At ? 3
       : timeLeft <= CFG.spawn.wave2At ? 2 : 1;
     const count = base + (Math.random() < 0.5 ? 0 : 1);
-    const vx = (Math.random() - 0.5) * W * CFG.physics.drift;
-    const vy = -H * (CFG.physics.launchMin + Math.random() * CFG.physics.launchRandom);
     const spacing = r * 2.4;
     const usable = W - 2 * r;
     const groupWidth = Math.min(usable, (count - 1) * spacing);
@@ -107,12 +121,16 @@ import { CONFIG } from './config.js';
     for (let i = 0; i < count; i++) {
       const isBomb = timeLeft <= CFG.spawn.bombAfterSeconds && Math.random() < CFG.spawn.bombChance;
       const isHigh = !isBomb && Math.random() < CFG.spawn.highChance;
+      const depth = r + Math.random() * H * 0.35;
+      const apex = H * (CFG.physics.apexMin + Math.random() * CFG.physics.apexRange);
+      const x = Math.max(r, Math.min(W - r, startX + step * i + (Math.random() - 0.5) * spacing * 0.9));
+      const y = H + depth;
 
       fruits.push({
-        x: startX + step * i,
-        y: H + r,
-        vx,
-        vy,
+        x,
+        y,
+        vx: (Math.random() - 0.5) * W * CFG.physics.drift,
+        vy: -Math.sqrt(2 * H * CFG.physics.gravity * (apex + depth)),
         r,
         rot: Math.random() * Math.PI * 2,
         spin: (Math.random() - 0.5) * CFG.physics.spin,
@@ -131,10 +149,25 @@ import { CONFIG } from './config.js';
   }
 
   function offscreen(p) {
-    return p.y - p.r > H * 1.2 || p.x < -2 * p.r || p.x > W + 2 * p.r;
+    return p.y - p.r > H * 1.5 || p.x < -2 * p.r || p.x > W + 2 * p.r;
+  }
+
+  function comboMultiplier() {
+    return Math.min(CFG.combo.max, 1 + Math.floor(comboProgress / CFG.combo.slicesPerTier));
   }
 
   function update(dt) {
+    if (comboProgress > 0) {
+      if (comboTimer > 0) {
+        comboTimer -= dt * 1000;
+      } else {
+        const drain = dt * 1000 * (CFG.combo.slicesPerTier / CFG.combo.decayMs);
+        comboProgress = Math.max(0, comboProgress - drain);
+      }
+    } else {
+      comboTimer = 0;
+    }
+
     spawnIn -= dt;
     if (spawnIn <= 0) {
       spawnWave();
@@ -143,6 +176,25 @@ import { CONFIG } from './config.js';
 
     for (const f of fruits) move(f, dt);
     for (const h of halves) move(h, dt);
+
+    shake = Math.max(0, shake - dt);
+
+    for (const p of particles) {
+      p.vy += H * CFG.physics.gravity * 0.7 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.life -= dt;
+    }
+    particles = particles.filter(p => p.life > 0);
+
+    for (const p of popups) {
+      p.y -= H * 0.12 * dt;
+      p.life -= dt;
+    }
+    popups = popups.filter(p => p.life > 0);
+
+    for (const c of cutFlashes) c.life -= dt;
+    cutFlashes = cutFlashes.filter(c => c.life > 0);
 
     fruits = fruits.filter(f => !offscreen(f));
     halves = halves.filter(h => !offscreen(h));
@@ -194,9 +246,46 @@ import { CONFIG } from './config.js';
     flashEl.classList.add('on');
   }
 
+  function burst(f, kind) {
+    const colors = JUICE_COLORS[kind];
+    const bomb = kind === 'bomb';
+    const count = bomb ? CFG.feedback.bombParticles : CFG.feedback.juiceParticles;
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = H * (bomb ? 0.45 + Math.random() * 0.75 : 0.18 + Math.random() * 0.5);
+      const life = CFG.feedback.particleLife * (0.6 + Math.random() * 0.6);
+
+      particles.push({
+        x: f.x + (Math.random() - 0.5) * f.r,
+        y: f.y + (Math.random() - 0.5) * f.r,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - H * 0.08,
+        radius: f.r * (bomb ? 0.1 + Math.random() * 0.22 : 0.06 + Math.random() * 0.16),
+        color: colors[(Math.random() * colors.length) | 0],
+        life,
+        maxLife: life
+      });
+    }
+  }
+
+  function addPopup(x, y, text, color) {
+    popups.push({
+      x,
+      y: y - Math.min(W, H) * 0.02,
+      text,
+      color,
+      life: CFG.feedback.popupLife,
+      maxLife: CFG.feedback.popupLife
+    });
+  }
+
+  function addCutFlash(x, y, angle, radius) {
+    cutFlashes.push({ x, y, angle, radius, life: 0.18, maxLife: 0.18 });
+  }
+
   function slice(x0, y0, x1, y1) {
     const angle = Math.atan2(y1 - y0, x1 - x0);
-    const now = performance.now();
     const remaining = [];
     let hitBomb = false;
 
@@ -205,14 +294,22 @@ import { CONFIG } from './config.js';
         if (f.bomb) {
           score += f.points;
           hitBomb = true;
+          shake = CFG.feedback.shakeTime;
+          burst(f, 'bomb');
+          addPopup(f.x, f.y, `${f.points}`, '#ff6b5a');
           flashScreen();
           playSound(EXPLOSION_AUDIO);
         } else {
-          if (now - lastHitAt > CFG.combo.windowMs) slashHits = 0;
-          slashHits++;
-          lastHitAt = now;
-          score += f.points * slashHits;
+          const multiplier = comboMultiplier();
+          const gained = f.points * multiplier;
+          const maxProgress = (CFG.combo.max - 1) * CFG.combo.slicesPerTier;
+          score += gained;
+          comboProgress = Math.min(maxProgress, comboProgress + 1);
+          comboTimer = CFG.combo.graceMs;
           split(f, angle);
+          burst(f, f.sprite);
+          addCutFlash(f.x, f.y, angle, f.r);
+          addPopup(f.x, f.y, `+${gained}`, f.sprite === 'high' || multiplier > 1 ? '#ffd36b' : '#fff3d6');
           playSound(SLASH_AUDIO[(Math.random() * SLASH_AUDIO.length) | 0]);
         }
       } else {
@@ -220,7 +317,10 @@ import { CONFIG } from './config.js';
       }
     }
 
-    if (hitBomb) slashHits = 0;
+    if (hitBomb) {
+      comboProgress = Math.max(0, comboProgress - CFG.combo.slicesPerTier * 2);
+      comboTimer = CFG.combo.graceMs;
+    }
     fruits = remaining;
   }
 
@@ -250,8 +350,41 @@ import { CONFIG } from './config.js';
   function draw() {
     ctx.clearRect(0, 0, W, H);
 
+    const shakeScale = shake > 0 ? shake / CFG.feedback.shakeTime : 0;
+    const shakeAmount = Math.min(W, H) * CFG.feedback.shakeAmount * shakeScale;
+    ctx.save();
+    if (shakeAmount > 0) {
+      ctx.translate(
+        (Math.random() * 2 - 1) * shakeAmount,
+        (Math.random() * 2 - 1) * shakeAmount
+      );
+    }
+
     for (const f of fruits) drawFruit(f, false);
     for (const h of halves) drawFruit(h, true);
+
+    for (const p of particles) {
+      ctx.globalAlpha = p.life / p.maxLife;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    for (const c of cutFlashes) {
+      const alpha = c.life / c.maxLife;
+      const dx = Math.cos(c.angle);
+      const dy = Math.sin(c.angle);
+      const length = c.radius * 2.2;
+      ctx.strokeStyle = `rgba(255, 244, 214, ${alpha})`;
+      ctx.lineWidth = Math.max(1.5, c.radius * 0.18);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(c.x - dx * length, c.y - dy * length);
+      ctx.lineTo(c.x + dx * length, c.y + dy * length);
+      ctx.stroke();
+    }
 
     if (trail.length > 1) {
       ctx.lineCap = 'round';
@@ -270,17 +403,34 @@ import { CONFIG } from './config.js';
       ctx.arc(blade.x, blade.y, Math.min(W, H) * 0.01, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `700 ${Math.min(W, H) * 0.05}px system-ui, sans-serif`;
+    for (const p of popups) {
+      ctx.globalAlpha = Math.min(1, (p.life / p.maxLife) * 1.5);
+      ctx.fillStyle = p.color;
+      ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
   }
 
   function start() {
     state = 'playing';
     score = 0;
-    slashHits = 0;
+    comboProgress = 0;
+    comboTimer = 0;
     timeLeft = DURATION;
     fruits = [];
     halves = [];
+    particles = [];
+    popups = [];
+    cutFlashes = [];
+    shake = 0;
     trail = [];
-    spawnIn = 0;
+    spawnIn = CFG.spawn.startDelay;
     lastPoint = null;
     blade = { x: W / 2, y: H / 2 };
     bladeJump = true;
@@ -291,8 +441,14 @@ import { CONFIG } from './config.js';
 
   function end() {
     state = 'over';
+    comboProgress = 0;
+    comboTimer = 0;
     fruits = [];
     halves = [];
+    particles = [];
+    popups = [];
+    cutFlashes = [];
+    shake = 0;
     trail = [];
     lastPoint = null;
     if (document.pointerLockElement) document.exitPointerLock();
@@ -381,6 +537,11 @@ import { CONFIG } from './config.js';
     }
 
     timeEl.textContent = Math.ceil(timeLeft);
+    const maxProgress = (CFG.combo.max - 1) * CFG.combo.slicesPerTier;
+    const tier = comboMultiplier();
+    comboFill.style.transform = `scaleX(${comboProgress / maxProgress})`;
+    comboLabel.textContent = `x${tier}`;
+    comboMeter.classList.toggle('maxed', tier === CFG.combo.max);
     scoreEl.textContent = score;
     trail = trail.filter(p => now - p.t < 120);
     draw();
@@ -408,7 +569,6 @@ import { CONFIG } from './config.js';
     if (SWORD && state === 'playing') canvas.requestPointerLock()?.catch?.(() => {});
     if (state === 'ready') start();
     else if (state === 'over') return;
-    slashHits = 0;
     lastPoint = localPoint(e);
     trail = [{ ...lastPoint, t: performance.now() }];
     if (!SWORD) canvas.setPointerCapture?.(e.pointerId);

@@ -10,7 +10,13 @@
   <main id="stage">
     <canvas id="game"></canvas>
     <div id="flash"></div>
-    <div id="hud"><span id="time">60</span><span id="score">0</span></div>
+    <div id="hud">
+      <div class="hud-top"><span id="time">60</span><span id="score">0</span></div>
+      <div id="combo-meter">
+        <div id="combo-track"><div id="combo-fill"></div></div>
+        <span id="combo-label">x1</span>
+      </div>
+    </div>
     <div id="overlay">Tap to start<small>Swipe to slice · <img src="assets/images/highpoint.png" alt="high value"> 12 · <img src="assets/images/minuspoint.png" alt="bomb"> −9</small></div>
 
     <div id="board" class="hidden">
