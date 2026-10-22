@@ -3,7 +3,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background-color: #03020
 body {
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at 50% 30%, #1a1219 0%, #09060a 55%, #030205 100%);
+  background-color: #050408;
+  background-image:
+    linear-gradient(rgba(5, 4, 7, .65), rgba(5, 4, 7, .9)),
+    url("assets/images/background.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -13,8 +19,8 @@ body {
 
 #stage {
   position: relative;
-  width: min(92vw, 69vh);
-  width: min(92vw, 69dvh);
+  width: min(96vw, 72vh);
+  width: min(96vw, 72dvh);
   aspect-ratio: 3 / 4;
   overflow: hidden;
   isolation: isolate;
