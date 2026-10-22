@@ -3,6 +3,7 @@ import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/1
 import {
   collection,
   doc,
+  getCountFromServer,
   getDoc,
   getDocs,
   getFirestore,
@@ -10,7 +11,8 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  setDoc
+  setDoc,
+  where
 } from 'https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js';
 import { CONFIG } from './config.js';
 
@@ -24,6 +26,16 @@ export async function getTopScores(count = 10) {
   return snapshot.docs.map(entry => ({ id: entry.id, ...entry.data() }));
 }
 
+async function getRank(score) {
+  try {
+    const higher = query(collection(db, 'scores'), where('score', '>', score));
+    const snapshot = await getCountFromServer(higher);
+    return snapshot.data().count + 1;
+  } catch {
+    return null;
+  }
+}
+
 export async function submitScore(name, score) {
   await auth.authStateReady();
   if (!auth.currentUser) await signInAnonymously(auth);
@@ -33,7 +45,9 @@ export async function submitScore(name, score) {
   const existing = await getDoc(ref);
   const best = existing.exists() ? existing.data().score : null;
 
-  if (best !== null && score < best) return { saved: false, best };
+  if (best !== null && score < best) {
+    return { saved: false, best, rank: await getRank(best) };
+  }
 
   const data = {
     uid,
@@ -44,5 +58,5 @@ export async function submitScore(name, score) {
   if (!existing.exists()) data.createdAt = serverTimestamp();
 
   await setDoc(ref, data, { merge: true });
-  return { saved: true, best: score };
+  return { saved: true, best: score, rank: await getRank(score) };
 }

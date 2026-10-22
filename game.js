@@ -44,6 +44,9 @@ import { CONFIG } from './config.js';
   const submitScoreBtn = document.getElementById('submit-score');
   const nameInput = document.getElementById('player-name');
   const boardStatus = document.getElementById('board-status');
+  const youRow = document.getElementById('you');
+  const youRank = document.getElementById('you-rank');
+  const youScore = document.getElementById('you-score');
   const playAgainBtn = document.getElementById('play-again');
 
   nameInput.value = localStorage.getItem('fruit-name') || '';
@@ -332,6 +335,9 @@ import { CONFIG } from './config.js';
     finalScoreEl.textContent = score;
     boardStatus.textContent = '';
     submitScoreBtn.disabled = false;
+    youScore.textContent = score;
+    youRank.textContent = '-';
+    youRow.classList.remove('hidden');
     board.classList.remove('hidden');
     renderScores();
   }
@@ -348,6 +354,8 @@ import { CONFIG } from './config.js';
     try {
       const { submitScore } = await loadFirebase();
       const result = await submitScore(name, score);
+      youScore.textContent = result.best;
+      youRank.textContent = result.rank ? `#${result.rank}` : '-';
       boardStatus.textContent = result.saved ? 'Saved.' : `Best so far: ${result.best}.`;
       renderScores();
     } catch {

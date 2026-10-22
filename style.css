@@ -179,3 +179,19 @@ body.sword #stage {
   text-align: center;
   opacity: .6;
 }
+
+#you {
+  display: grid;
+  grid-template-columns: 2.5em 1fr auto;
+  gap: 1.5vmin;
+  padding: 1.5vmin 2vmin;
+  border: 1px solid #ff8a1f66;
+  border-radius: 1.2vmin;
+  background: #ff8a1f14;
+  font-size: 3.8vmin;
+  font-weight: 600;
+  text-align: left;
+}
+
+#you.hidden { display: none; }
+#you span:last-child { font-variant-numeric: tabular-nums; }
