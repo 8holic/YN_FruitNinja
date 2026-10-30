@@ -768,6 +768,15 @@ import { CONFIG } from './config.js';
     return dist > max ? { x: (x / dist) * max, y: (y / dist) * max } : { x, y };
   }
 
+  function enterFullscreen() {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    try {
+      const result = req?.call(el);
+      if (result?.catch) result.catch(() => {});
+    } catch {}
+  }
+
   function startTarget() {
     const el = document.getElementById('start-pumpkin');
     if (!el) return null;
@@ -812,6 +821,7 @@ import { CONFIG } from './config.js';
     const p = localPoint(e);
 
     if (state === 'ready') {
+      enterFullscreen();
       startTrack.set(e.pointerId, { x: p.x, y: p.y });
       const target = startTarget();
       if (target && Math.hypot(p.x - target.x, p.y - target.y) <= target.r) {
