@@ -48,6 +48,25 @@
     </div>
   </main>
 
+  <script>
+    function goFullscreen() {
+      const el = document.documentElement;
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      try {
+        const result = req && req.call(el);
+        if (result && result.catch) result.catch(() => {});
+      } catch {}
+    }
+
+    if (new URLSearchParams(location.search).has('kiosk')) {
+      const fsBtn = document.createElement('button');
+      fsBtn.id = 'fs';
+      fsBtn.textContent = 'F';
+      fsBtn.onclick = goFullscreen;
+      document.body.appendChild(fsBtn);
+    }
+  </script>
+
   <script type="module" src="game.js"></script>
 </body>
 </html>

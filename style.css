@@ -1,3 +1,20 @@
+#fs {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 9999;
+  width: 5vmin;
+  height: 5vmin;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #000;
+  font-size: 1.6vmin;
+  opacity: .04;
+}
+
+#fs:active { opacity: .25; }
+
 html, body { margin: 0; height: 100%; overflow: hidden; background-color: #030205; overscroll-behavior: none; }
 
 body {
