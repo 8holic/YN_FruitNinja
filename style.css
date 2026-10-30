@@ -18,14 +18,10 @@ body {
 }
 
 #stage {
-  position: relative;
-  height: 80vh;
-  height: 80dvh;
-  width: min(96vw, 80vh);
-  width: min(96vw, 80dvh);
+  position: fixed;
+  inset: 0;
   overflow: hidden;
   isolation: isolate;
-  border-radius: 2.5vmin;
   background-color: #0b080c;
   background-image:
     radial-gradient(ellipse at 50% 52%, transparent 32%, rgba(3, 2, 5, .78) 100%),
@@ -132,16 +128,6 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   to { opacity: 0; }
 }
 
-body.sword #stage {
-  position: fixed;
-  inset: 0;
-  width: auto;
-  height: auto;
-  aspect-ratio: auto;
-  border-radius: 0;
-  box-shadow: none;
-}
-
 #hud {
   position: absolute;
   top: 0;
@@ -159,6 +145,17 @@ body.sword #stage {
 }
 
 .hud-top { display: flex; justify-content: space-between; }
+
+#time.urgent {
+  color: #ff5a4a;
+  animation: urgent-pulse .55s ease-in-out infinite alternate;
+  text-shadow: 0 0 2.5vmin #ff2418, 0 2px 8px #000a;
+}
+
+@keyframes urgent-pulse {
+  from { transform: scale(1); opacity: .82; }
+  to { transform: scale(1.12); opacity: 1; }
+}
 
 #combo-meter {
   display: flex;
@@ -236,6 +233,21 @@ body.sword #stage {
 }
 
 #overlay small img { height: 1.1em; vertical-align: -0.18em; }
+
+#start-pumpkin {
+  display: block;
+  width: 17vmin;
+  height: 17vmin;
+  object-fit: contain;
+  margin: 1.5vmin auto;
+  filter: drop-shadow(0 0 2vmin rgba(255, 150, 60, .5));
+  animation: start-bob 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes start-bob {
+  from { transform: scale(1) rotate(-4deg); }
+  to { transform: scale(1.09) rotate(4deg); }
+}
 
 #overlay.hidden { display: none; }
 

@@ -35,6 +35,7 @@ export const CONFIG = {
   spawn: {
     bombAfterSeconds: 50,
     bombChance: 0.18,
+    bombMaxPerWave: 2,
     highChance: 0.1,
     wave2At: 50,
     wave3At: 25,

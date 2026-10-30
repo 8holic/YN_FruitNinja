@@ -70,10 +70,10 @@ import { CONFIG } from './config.js';
 
   if (SWORD) {
     document.body.classList.add('sword');
-    overlay.querySelector('small').textContent = 'Move to slice · click to recenter';
+    overlay.querySelector('small').insertAdjacentHTML('afterbegin', 'Move to slice · click to recenter<br>');
   }
 
-  let W = 0, H = 0;
+  let W = 0, H = 0, S = 0;
   let fruits = [];
   let halves = [];
   let particles = [];
@@ -88,7 +88,8 @@ import { CONFIG } from './config.js';
   let state = 'ready';
   let spawnIn = 0;
   let lastFrame = 0;
-  let lastPoint = null;
+  const pointers = new Map();
+  const startTrack = new Map();
   let blade = { x: 0, y: 0 };
   let bladeJump = true;
   let bladeVisible = true;
@@ -97,6 +98,7 @@ import { CONFIG } from './config.js';
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = canvas.clientWidth;
     H = canvas.clientHeight;
+    S = Math.min(W, H);
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -110,7 +112,7 @@ import { CONFIG } from './config.js';
   }
 
   function spawnWave() {
-    const r = Math.min(W, H) * CFG.physics.radius;
+    const r = S * CFG.physics.radius;
     const base = timeLeft <= CFG.spawn.wave4At ? 4
       : timeLeft <= CFG.spawn.wave3At ? 3
       : timeLeft <= CFG.spawn.wave2At ? 2 : 1;
@@ -121,8 +123,10 @@ import { CONFIG } from './config.js';
     const startX = r + Math.random() * Math.max(0, usable - groupWidth);
     const step = count > 1 ? groupWidth / (count - 1) : 0;
 
+    let bombs = 0;
     for (let i = 0; i < count; i++) {
-      const isBomb = timeLeft <= CFG.spawn.bombAfterSeconds && Math.random() < CFG.spawn.bombChance;
+      const isBomb = bombs < CFG.spawn.bombMaxPerWave && timeLeft <= CFG.spawn.bombAfterSeconds && Math.random() < CFG.spawn.bombChance;
+      if (isBomb) bombs++;
       const isHigh = !isBomb && Math.random() < CFG.spawn.highChance;
       const depth = r + Math.random() * H * 0.35;
       const apex = H * (CFG.physics.apexMin + Math.random() * CFG.physics.apexRange);
@@ -132,7 +136,7 @@ import { CONFIG } from './config.js';
       fruits.push({
         x,
         y,
-        vx: (Math.random() - 0.5) * W * CFG.physics.drift,
+        vx: (Math.random() - 0.5) * S * CFG.physics.drift,
         vy: -Math.sqrt(2 * H * CFG.physics.gravity * (apex + depth)),
         r,
         rot: Math.random() * Math.PI * 2,
@@ -321,7 +325,7 @@ import { CONFIG } from './config.js';
     }
 
     if (hitBomb) {
-      comboProgress = Math.max(0, comboProgress - CFG.combo.slicesPerTier * 2);
+      comboProgress = Math.max(0, comboProgress - CFG.combo.slicesPerTier);
       comboTimer = CFG.combo.graceMs;
     }
     fruits = remaining;
@@ -389,14 +393,20 @@ import { CONFIG } from './config.js';
       ctx.stroke();
     }
 
-    if (trail.length > 1) {
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.lineWidth = Math.min(W, H) * 0.012;
+    const trails = SWORD
+      ? [{ trail, hue: null }]
+      : [...pointers.values()].map(p => ({ trail: p.trail, hue: p.hue }));
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.min(W, H) * 0.012;
+    for (const { trail: points, hue } of trails) {
+      if (points.length < 2) continue;
+      ctx.strokeStyle = hue == null
+        ? 'rgba(255, 255, 255, 0.7)'
+        : `hsla(${hue}, 95%, 68%, 0.85)`;
       ctx.beginPath();
-      ctx.moveTo(trail[0].x, trail[0].y);
-      for (let i = 1; i < trail.length; i++) ctx.lineTo(trail[i].x, trail[i].y);
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.stroke();
     }
 
@@ -418,6 +428,17 @@ import { CONFIG } from './config.js';
     ctx.globalAlpha = 1;
 
     ctx.restore();
+
+    if (state === 'playing' && timeLeft <= 10) {
+      const urgency = 1 - timeLeft / 10;
+      const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 140);
+      const alpha = (0.06 + 0.2 * urgency) * pulse;
+      const glow = ctx.createRadialGradient(W / 2, H / 2, S * 0.35, W / 2, H / 2, Math.max(W, H) * 0.72);
+      glow.addColorStop(0, 'rgba(255, 40, 30, 0)');
+      glow.addColorStop(1, `rgba(255, 40, 30, ${alpha})`);
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H);
+    }
   }
 
   function start() {
@@ -434,7 +455,8 @@ import { CONFIG } from './config.js';
     shake = 0;
     trail = [];
     spawnIn = CFG.spawn.startDelay;
-    lastPoint = null;
+    pointers.clear();
+    startTrack.clear();
     blade = { x: W / 2, y: H / 2 };
     bladeJump = true;
     bladeVisible = true;
@@ -453,7 +475,7 @@ import { CONFIG } from './config.js';
     cutFlashes = [];
     shake = 0;
     trail = [];
-    lastPoint = null;
+    pointers.clear();
     if (document.pointerLockElement) document.exitPointerLock();
     showBoard();
   }
@@ -722,6 +744,7 @@ import { CONFIG } from './config.js';
     }
 
     timeEl.textContent = Math.ceil(timeLeft);
+    timeEl.classList.toggle('urgent', state === 'playing' && timeLeft <= 10);
     const maxProgress = (CFG.combo.max - 1) * CFG.combo.slicesPerTier;
     const tier = comboMultiplier();
     comboFill.style.transform = `scaleX(${comboProgress / maxProgress})`;
@@ -729,6 +752,7 @@ import { CONFIG } from './config.js';
     comboMeter.classList.toggle('maxed', tier === CFG.combo.max);
     scoreEl.textContent = score;
     trail = trail.filter(p => now - p.t < 120);
+    for (const ptr of pointers.values()) ptr.trail = ptr.trail.filter(p => now - p.t < 120);
     draw();
     requestAnimationFrame(frame);
   }
@@ -744,6 +768,36 @@ import { CONFIG } from './config.js';
     return dist > max ? { x: (x / dist) * max, y: (y / dist) * max } : { x, y };
   }
 
+  function startTarget() {
+    const el = document.getElementById('start-pumpkin');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    const c = canvas.getBoundingClientRect();
+    return {
+      x: r.left + r.width / 2 - c.left,
+      y: r.top + r.height / 2 - c.top,
+      r: Math.max(r.width, r.height) * 0.5
+    };
+  }
+
+  function beginFromPoint(e, x, y, angle) {
+    const target = startTarget();
+    start();
+    if (target) {
+      const f = { x: target.x, y: target.y, vx: 0, vy: -S * 0.15, r: target.r, rot: 0, spin: 0, sprite: 'fruit' };
+      split(f, angle);
+      burst(f, 'fruit');
+      addCutFlash(f.x, f.y, angle, f.r);
+    }
+    pointers.set(e.pointerId, {
+      x,
+      y,
+      hue: (e.pointerId * 67) % 360,
+      trail: [{ x, y, t: performance.now() }]
+    });
+  }
+
   window.addEventListener('pointerdown', e => {
     if (SWORD && document.pointerLockElement === canvas) {
       blade = { x: W / 2, y: H / 2 };
@@ -752,14 +806,42 @@ import { CONFIG } from './config.js';
       return;
     }
     if (SWORD && state === 'playing') canvas.requestPointerLock()?.catch?.(() => {});
-    if (state === 'ready') start();
-    else if (state === 'over') return;
-    lastPoint = localPoint(e);
-    trail = [{ ...lastPoint, t: performance.now() }];
-    if (!SWORD) canvas.setPointerCapture?.(e.pointerId);
+    if (state === 'over') return;
+
+    const p = localPoint(e);
+
+    if (state === 'ready') {
+      startTrack.set(e.pointerId, { x: p.x, y: p.y });
+      const target = startTarget();
+      if (target && Math.hypot(p.x - target.x, p.y - target.y) <= target.r) {
+        beginFromPoint(e, p.x, p.y, Math.random() * Math.PI);
+      }
+      return;
+    }
+
+    if (SWORD) {
+      trail = [{ ...p, t: performance.now() }];
+      return;
+    }
+    pointers.set(e.pointerId, { x: p.x, y: p.y, hue: (e.pointerId * 67) % 360, trail: [{ ...p, t: performance.now() }] });
+    canvas.setPointerCapture?.(e.pointerId);
   });
 
   window.addEventListener('pointermove', e => {
+    if (state === 'ready') {
+      const track = startTrack.get(e.pointerId);
+      const target = track && startTarget();
+      if (target) {
+        const p = localPoint(e);
+        if (segmentHitsCircle(track.x, track.y, p.x, p.y, target.x, target.y, target.r)) {
+          beginFromPoint(e, p.x, p.y, Math.atan2(p.y - track.y, p.x - track.x));
+        } else {
+          track.x = p.x;
+          track.y = p.y;
+        }
+      }
+      return;
+    }
     if (state !== 'playing') return;
 
     if (SWORD) {
@@ -800,16 +882,19 @@ import { CONFIG } from './config.js';
       return;
     }
 
-    if (!lastPoint) return;
+    const ptr = pointers.get(e.pointerId);
+    if (!ptr) return;
     const p = localPoint(e);
-    trail.push({ ...p, t: performance.now() });
-    slice(lastPoint.x, lastPoint.y, p.x, p.y);
-    lastPoint = p;
+    ptr.trail.push({ ...p, t: performance.now() });
+    slice(ptr.x, ptr.y, p.x, p.y);
+    ptr.x = p.x;
+    ptr.y = p.y;
   });
 
-  const release = () => { lastPoint = null; };
+  const release = e => { pointers.delete(e.pointerId); startTrack.delete(e.pointerId); };
   const loseFocus = () => {
-    lastPoint = null;
+    pointers.clear();
+    startTrack.clear();
     bladeJump = true;
     bladeVisible = false;
   };
@@ -822,7 +907,8 @@ import { CONFIG } from './config.js';
   });
   window.addEventListener('resize', resize);
   document.addEventListener('pointerlockchange', () => {
-    lastPoint = null;
+    pointers.clear();
+    startTrack.clear();
     trail = [];
     bladeJump = true;
     bladeVisible = true;
