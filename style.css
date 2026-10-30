@@ -155,7 +155,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   gap: 1.2vmin;
   padding: 4vmin;
   color: #fff;
-  font-size: 6vmin;
+  font-size: 7.2vmin;
   font-weight: 700;
   pointer-events: none;
   text-shadow: 0 2px 8px #000a;
@@ -183,7 +183,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 #combo-track {
   position: relative;
   flex: 1;
-  height: 1.4vmin;
+  height: 1.7vmin;
   overflow: hidden;
   border-radius: 999px;
   background: #ffffff1a;
@@ -212,7 +212,7 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 #combo-label {
   min-width: 2.2em;
   color: #ffb35c;
-  font-size: 3.4vmin;
+  font-size: 4.1vmin;
   text-align: right;
 }
 
@@ -253,8 +253,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 
 #start-pumpkin {
   display: block;
-  width: 17vmin;
-  height: 17vmin;
+  width: 20vmin;
+  height: 20vmin;
   object-fit: contain;
   margin: 1.5vmin auto;
   filter: drop-shadow(0 0 2vmin rgba(255, 150, 60, .5));

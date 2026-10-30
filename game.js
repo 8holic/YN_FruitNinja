@@ -113,6 +113,7 @@ import { CONFIG } from './config.js';
 
   function spawnWave() {
     const r = S * CFG.physics.radius;
+    const bombR = S * CFG.physics.bombRadius;
     const base = timeLeft <= CFG.spawn.wave4At ? 4
       : timeLeft <= CFG.spawn.wave3At ? 3
       : timeLeft <= CFG.spawn.wave2At ? 2 : 1;
@@ -128,7 +129,8 @@ import { CONFIG } from './config.js';
       const isBomb = bombs < CFG.spawn.bombMaxPerWave && timeLeft <= CFG.spawn.bombAfterSeconds && Math.random() < CFG.spawn.bombChance;
       if (isBomb) bombs++;
       const isHigh = !isBomb && Math.random() < CFG.spawn.highChance;
-      const depth = r + Math.random() * H * 0.35;
+      const objR = isBomb ? bombR : r;
+      const depth = objR + Math.random() * H * 0.35;
       const apex = H * (CFG.physics.apexMin + Math.random() * CFG.physics.apexRange);
       const x = Math.max(r, Math.min(W - r, startX + step * i + (Math.random() - 0.5) * spacing * 0.9));
       const y = H + depth;
@@ -138,7 +140,7 @@ import { CONFIG } from './config.js';
         y,
         vx: (Math.random() - 0.5) * S * CFG.physics.drift,
         vy: -Math.sqrt(2 * H * CFG.physics.gravity * (apex + depth)),
-        r,
+        r: objR,
         rot: Math.random() * Math.PI * 2,
         spin: (Math.random() - 0.5) * CFG.physics.spin,
         sprite: isBomb ? 'bomb' : isHigh ? 'high' : 'fruit',
@@ -398,7 +400,7 @@ import { CONFIG } from './config.js';
       : [...pointers.values()].map(p => ({ trail: p.trail, hue: p.hue }));
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.min(W, H) * 0.012;
+    ctx.lineWidth = Math.min(W, H) * 0.0144;
     for (const { trail: points, hue } of trails) {
       if (points.length < 2) continue;
       ctx.strokeStyle = hue == null
@@ -419,7 +421,7 @@ import { CONFIG } from './config.js';
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = `700 ${Math.min(W, H) * 0.05}px system-ui, sans-serif`;
+    ctx.font = `700 ${Math.min(W, H) * 0.06}px system-ui, sans-serif`;
     for (const p of popups) {
       ctx.globalAlpha = Math.min(1, (p.life / p.maxLife) * 1.5);
       ctx.fillStyle = p.color;
@@ -478,6 +480,26 @@ import { CONFIG } from './config.js';
     pointers.clear();
     if (document.pointerLockElement) document.exitPointerLock();
     showBoard();
+  }
+
+  function resetToReady() {
+    state = 'ready';
+    score = 0;
+    comboProgress = 0;
+    comboTimer = 0;
+    timeLeft = DURATION;
+    fruits = [];
+    halves = [];
+    particles = [];
+    popups = [];
+    cutFlashes = [];
+    shake = 0;
+    trail = [];
+    spawnIn = CFG.spawn.startDelay;
+    pointers.clear();
+    startTrack.clear();
+    board.classList.add('hidden');
+    overlay.classList.remove('hidden');
   }
 
   async function renderScores() {
@@ -727,7 +749,7 @@ import { CONFIG } from './config.js';
     }
   });
 
-  playAgainBtn.addEventListener('click', () => location.reload());
+  playAgainBtn.addEventListener('click', resetToReady);
 
   function frame(now) {
     const dt = lastFrame ? Math.min((now - lastFrame) / 1000, 0.05) : 0;

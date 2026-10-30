@@ -46,7 +46,8 @@ export const CONFIG = {
   },
 
   physics: {
-    radius: 0.08,
+    radius: 0.096,
+    bombRadius: 0.07,
     gravity: 1.5,
     apexMin: 0.5,
     apexRange: 0.35,
