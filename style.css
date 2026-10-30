@@ -19,7 +19,7 @@ body {
 
 #stage {
   position: fixed;
-  inset: 0;
+  inset: 5%;
   overflow: hidden;
   isolation: isolate;
   background-color: #0b080c;

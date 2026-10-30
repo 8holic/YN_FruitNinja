@@ -789,6 +789,7 @@ import { CONFIG } from './config.js';
       split(f, angle);
       burst(f, 'fruit');
       addCutFlash(f.x, f.y, angle, f.r);
+      playSound(SLASH_AUDIO[(Math.random() * SLASH_AUDIO.length) | 0]);
     }
     pointers.set(e.pointerId, {
       x,
