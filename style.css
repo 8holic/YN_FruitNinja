@@ -182,6 +182,8 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   display: flex;
   align-items: center;
   gap: 2vmin;
+  --tier: #ffd24a;
+  --tier-prev: #ffffff1a;
 }
 
 #combo-track {
@@ -190,19 +192,9 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   height: 1.7vmin;
   overflow: hidden;
   border-radius: 999px;
-  background: #ffffff1a;
-}
-
-#combo-track::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    90deg,
-    transparent 0 calc(25% - 1px),
-    rgba(0, 0, 0, .45) calc(25% - 1px) 25%
-  );
+  background: var(--tier-prev);
+  box-shadow: inset 0 0 0 1px #ffffff2e;
+  transition: background .2s ease;
 }
 
 #combo-fill {
@@ -210,14 +202,28 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
   height: 100%;
   transform: scaleX(0);
   transform-origin: left;
-  background: linear-gradient(90deg, #ffb35c, #ff4b3a);
+  background: var(--tier);
+  transition: background .2s ease;
 }
 
 #combo-label {
+  display: inline-block;
+  transform-origin: right center;
   min-width: 2.2em;
-  color: #ffb35c;
+  color: var(--tier);
   font-size: 4.1vmin;
   text-align: right;
+  transition: color .2s ease;
+}
+
+#combo-label.pop {
+  animation: combo-pop .3s ease-out;
+}
+
+@keyframes combo-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.5); }
+  100% { transform: scale(1); }
 }
 
 #combo-meter.maxed #combo-fill {
@@ -392,4 +398,5 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 @media (prefers-reduced-motion: reduce) {
   #stage::before, #stage::after { animation: none; }
   #combo-meter.maxed #combo-fill { animation: none; }
+  #combo-label.pop { animation: none; }
 }

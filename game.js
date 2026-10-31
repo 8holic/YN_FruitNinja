@@ -19,6 +19,8 @@ import { CONFIG } from './config.js';
     { key: 'epic', label: 'EPIC', color: '#c084fc', rgb: '192,132,252' },
     { key: 'unique', label: 'UNIQUE', color: '#ffd400', rgb: '255,212,0' }
   ];
+  const COMBO_COLORS = ['#ffd24a', '#ff9a3c', '#ff6b2e', '#ff3b2f', '#ffd400'];
+  const COMBO_NOTES = [0, 0, 523.25, 659.25, 783.99, 1046.5]; // ponytail: C5 E5 G5 C6, triangle chime per tier
   const NO_PRIZE = { key: 'none', label: 'NO PRIZE', color: '#9aa0a6', rgb: '154,160,166' };
 
   const kiosk = KIOSK2
@@ -104,6 +106,7 @@ import { CONFIG } from './config.js';
   let score = 0;
   let comboProgress = 0;
   let comboTimer = 0;
+  let comboVisualTier = 0;
   let timeLeft = DURATION;
   let state = 'ready';
   let spawnIn = 0;
@@ -310,6 +313,31 @@ import { CONFIG } from './config.js';
         sprite: f.sprite
       });
     }
+  }
+
+  let audioCtx = null;
+
+  function unlockAudio() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx ??= new Ctx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function playComboChime(tier) {
+    const freq = COMBO_NOTES[tier];
+    if (!audioCtx || !freq) return;
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.25, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.2);
   }
 
   function playSound(track) {
@@ -526,22 +554,27 @@ import { CONFIG } from './config.js';
 
     if (chest && (state === 'chest' || state === 'reveal')) drawChest();
 
+    const combo = comboMultiplier();
+    const boost = (combo - 1) / (CFG.combo.max - 1);
     const trails = SWORD
       ? [{ trail, hue: null }]
       : [...pointers.values()].map(p => ({ trail: p.trail, hue: p.hue }));
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.min(W, H) * 0.0144;
+    ctx.lineWidth = Math.min(W, H) * (0.0144 + 0.010 * boost);
+    ctx.shadowColor = COMBO_COLORS[combo - 1];
+    ctx.shadowBlur = Math.min(W, H) * 0.03 * boost;
     for (const { trail: points, hue } of trails) {
       if (points.length < 2) continue;
       ctx.strokeStyle = hue == null
-        ? 'rgba(255, 255, 255, 0.7)'
-        : `hsla(${hue}, 95%, 68%, 0.85)`;
+        ? (boost > 0 ? COMBO_COLORS[combo - 1] : 'rgba(255, 255, 255, 0.7)')
+        : `hsla(${hue}, 95%, ${68 + boost * 10}%, 0.85)`;
       ctx.beginPath();
       ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
       ctx.stroke();
     }
+    ctx.shadowBlur = 0;
 
     if (SWORD && state === 'playing' && bladeVisible) {
       ctx.fillStyle = '#fff';
@@ -577,6 +610,7 @@ import { CONFIG } from './config.js';
   }
 
   function start() {
+    unlockAudio();
     state = 'playing';
     score = 0;
     comboProgress = 0;
@@ -933,14 +967,29 @@ import { CONFIG } from './config.js';
 
     timeEl.textContent = Math.ceil(timeLeft);
     timeEl.classList.toggle('urgent', state === 'playing' && timeLeft <= 10);
-    const maxProgress = (CFG.combo.max - 1) * CFG.combo.slicesPerTier;
     const tier = comboMultiplier();
-    comboFill.style.transform = `scaleX(${comboProgress / maxProgress})`;
+    const fill = tier === CFG.combo.max
+      ? 1
+      : (comboProgress % CFG.combo.slicesPerTier) / CFG.combo.slicesPerTier;
+    comboFill.style.transform = `scaleX(${fill})`;
     comboLabel.textContent = `x${tier}`;
     comboMeter.classList.toggle('maxed', tier === CFG.combo.max);
+    if (tier !== comboVisualTier) {
+      const up = tier > comboVisualTier && comboVisualTier > 0;
+      comboVisualTier = tier;
+      comboMeter.style.setProperty('--tier', COMBO_COLORS[tier - 1]);
+      comboMeter.style.setProperty('--tier-prev', tier > 1 ? COMBO_COLORS[tier - 2] : '#ffffff1a');
+      if (up) {
+        comboLabel.classList.remove('pop');
+        void comboLabel.offsetWidth;
+        comboLabel.classList.add('pop');
+        playComboChime(tier);
+      }
+    }
     scoreEl.textContent = score;
-    trail = trail.filter(p => now - p.t < 120);
-    for (const ptr of pointers.values()) ptr.trail = ptr.trail.filter(p => now - p.t < 120);
+    const trailLife = 120 + (tier - 1) * 35;
+    trail = trail.filter(p => now - p.t < trailLife);
+    for (const ptr of pointers.values()) ptr.trail = ptr.trail.filter(p => now - p.t < trailLife);
     draw();
     requestAnimationFrame(frame);
   }
