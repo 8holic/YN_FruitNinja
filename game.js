@@ -19,7 +19,7 @@ import { CONFIG } from './config.js';
     { key: 'epic', label: 'EPIC', color: '#c084fc', rgb: '192,132,252' },
     { key: 'unique', label: 'UNIQUE', color: '#ffd400', rgb: '255,212,0' }
   ];
-  const COMBO_COLORS = ['#ffd24a', '#ff9a3c', '#ff6b2e', '#ff3b2f', '#ffd400'];
+  const COMBO_COLORS = ['#ffffff', '#4ade80', '#c084fc', '#ff8a1f', '#ffd400'];
   const COMBO_NOTES = [0, 0, 523.25, 659.25, 783.99, 1046.5]; // ponytail: C5 E5 G5 C6, triangle chime per tier
   const NO_PRIZE = { key: 'none', label: 'NO PRIZE', color: '#9aa0a6', rgb: '154,160,166' };
 
@@ -238,6 +238,11 @@ import { CONFIG } from './config.js';
     return Math.min(CFG.combo.max, 1 + Math.floor(comboProgress / CFG.combo.slicesPerTier));
   }
 
+  function scoreMultiplier() {
+    const tier = comboMultiplier();
+    return tier === CFG.combo.max ? CFG.combo.maxScore : tier;
+  }
+
   function update(dt) {
     if (comboProgress > 0) {
       if (comboTimer > 0) {
@@ -411,7 +416,7 @@ import { CONFIG } from './config.js';
             playSound(SCREAM_AUDIO);
           }
         } else {
-          const multiplier = comboMultiplier();
+          const multiplier = scoreMultiplier();
           const gained = f.points * multiplier;
           const maxProgress = (CFG.combo.max - 1) * CFG.combo.slicesPerTier;
           score += gained;
@@ -650,6 +655,7 @@ import { CONFIG } from './config.js';
     if (document.pointerLockElement) document.exitPointerLock();
 
     if (KIOSK) {
+      if (!KIOSK2) loadFirebase().then(({ logGame }) => logGame(score)).catch(err => console.error('[logGame]', err));
       const tier = score >= kiosk.threshold ? pickTier() : null;
       beginChest(tier || NO_PRIZE);
       return;
@@ -972,7 +978,7 @@ import { CONFIG } from './config.js';
       ? 1
       : (comboProgress % CFG.combo.slicesPerTier) / CFG.combo.slicesPerTier;
     comboFill.style.transform = `scaleX(${fill})`;
-    comboLabel.textContent = `x${tier}`;
+    comboLabel.textContent = `x${tier === CFG.combo.max ? CFG.combo.maxScore : tier}`;
     comboMeter.classList.toggle('maxed', tier === CFG.combo.max);
     if (tier !== comboVisualTier) {
       const up = tier > comboVisualTier && comboVisualTier > 0;

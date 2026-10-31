@@ -2,7 +2,7 @@ export const CONFIG = {
   duration: 60,
 
   kiosk: {
-    threshold: 120,
+    threshold: 3000,
     weights: { common: 100, rare: 50, epic: 10, unique: 1 }
   },
 
@@ -28,6 +28,7 @@ export const CONFIG = {
 
   combo: {
     max: 5,
+    maxScore: 7,
     slicesPerTier: 10,
     graceMs: 1000,
     decayMs: 4000

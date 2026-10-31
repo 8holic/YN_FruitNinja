@@ -44,6 +44,18 @@ async function getRank(score) {
   }
 }
 
+export async function logGame(score) {
+  try {
+    await auth.authStateReady();
+    if (!auth.currentUser) await signInAnonymously(auth);
+  } catch {}
+
+  await addDoc(collection(db, 'games'), {
+    score,
+    createdAt: serverTimestamp()
+  });
+}
+
 export async function submitScore(name, score) {
   await auth.authStateReady();
   if (!auth.currentUser) await signInAnonymously(auth);

@@ -21,6 +21,18 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /games/{gameId} {
+      allow read: if false;
+
+      allow create: if request.resource.data.score is int
+        && request.resource.data.score >= -999999
+        && request.resource.data.score <= 999999
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.keys().hasOnly(['score', 'createdAt']);
+
+      allow update, delete: if false;
+    }
+
     match /settings/{document} {
       allow read: if true;
       allow write: if false;
