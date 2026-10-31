@@ -9,7 +9,21 @@ import { CONFIG } from './config.js';
   const SWORD = params.has('sword');
   const SWORD_SENS = Math.max(0.1, Math.min(2, Number(params.get('sens')) || CFG.sword.sensitivity));
   const SWAP_AXES = params.has('swap');
+  const KIOSK = params.has('kiosk');
   const sprites = {};
+
+  const TIERS = [
+    { key: 'common', label: 'COMMON', color: '#ffffff', rgb: '255,255,255' },
+    { key: 'rare', label: 'RARE', color: '#4ade80', rgb: '74,222,128' },
+    { key: 'epic', label: 'EPIC', color: '#c084fc', rgb: '192,132,252' },
+    { key: 'unique', label: 'UNIQUE', color: '#ffd400', rgb: '255,212,0' }
+  ];
+  const NO_PRIZE = { key: 'none', label: 'NO PRIZE', color: '#9aa0a6', rgb: '154,160,166' };
+
+  const kiosk = {
+    threshold: CFG.kiosk.threshold,
+    weights: { ...CFG.kiosk.weights }
+  };
 
   for (const [kind, src] of Object.entries(CFG.assets.sprites)) {
     const img = new Image();
@@ -33,7 +47,12 @@ import { CONFIG } from './config.js';
   const JUICE_COLORS = {
     fruit: ['#ff9a2e', '#ffbf5a', '#e06b16', '#a33d12'],
     high: ['#ffd36b', '#ff9a2e', '#ff6b2e', '#c94c14'],
-    bomb: ['#ffefd6', '#c9c4d6', '#ff4b3a', '#7a1f1f']
+    bomb: ['#ffefd6', '#c9c4d6', '#ff4b3a', '#7a1f1f'],
+    common: ['#ffffff', '#e8e8ff', '#c9c9d6', '#a8a8b8'],
+    rare: ['#d9ffe6', '#4ade80', '#22c55e', '#15803d'],
+    epic: ['#f5e6ff', '#c084fc', '#a855f7', '#7e22ce'],
+    unique: ['#fffbe0', '#ffd400', '#facc15', '#eab308'],
+    none: ['#e6e8ea', '#9aa0a6', '#6b7075', '#4a4e52']
   };
 
   const canvas = document.getElementById('game');
@@ -93,6 +112,54 @@ import { CONFIG } from './config.js';
   let blade = { x: 0, y: 0 };
   let bladeJump = true;
   let bladeVisible = true;
+  let chest = null;
+  let revealedAt = 0;
+  let kioskTarget = null;
+
+  if (KIOSK) {
+    kioskTarget = document.createElement('span');
+    kioskTarget.id = 'kiosk-target';
+    overlay.querySelector('.start-title').after(kioskTarget);
+    updateKioskTarget();
+    loadFirebase()
+      .then(({ watchKioskSettings }) => watchKioskSettings(applyKioskSettings))
+      .catch(() => {});
+  }
+
+  function positive(value) {
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 ? number : 0;
+  }
+
+  function updateKioskTarget() {
+    if (kioskTarget) kioskTarget.textContent = `Score ${kiosk.threshold.toLocaleString()} to win a prize`;
+  }
+
+  function applyKioskSettings(data) {
+    if (!data) return;
+    const threshold = Number(data.threshold);
+    if (Number.isFinite(threshold) && threshold >= 0) kiosk.threshold = Math.round(threshold);
+    const weights = data.weights && typeof data.weights === 'object' ? data.weights : data;
+    for (const tier of TIERS) kiosk.weights[tier.key] = positive(weights[tier.key]);
+    updateKioskTarget();
+  }
+
+  function pickTier() {
+    const options = TIERS
+      .map(tier => [tier, positive(kiosk.weights[tier.key])])
+      .filter(([, weight]) => weight > 0);
+    const total = options.reduce((sum, [, weight]) => sum + weight, 0);
+    if (!total) return null;
+    let roll = Math.random() * total;
+    for (const [tier, weight] of options) {
+      if ((roll -= weight) < 0) return tier;
+    }
+    return options[options.length - 1][0];
+  }
+
+  function chestTarget() {
+    return { x: W / 2, y: H * 0.52, r: S * 0.17 };
+  }
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -356,6 +423,59 @@ import { CONFIG } from './config.js';
     ctx.restore();
   }
 
+  function drawChest() {
+    const target = chestTarget();
+    const tier = chest.tier;
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 220);
+
+    const glow = ctx.createRadialGradient(target.x, target.y, 0, target.x, target.y, target.r * 2.4);
+    glow.addColorStop(0, `rgba(${tier.rgb}, ${0.28 + 0.22 * pulse})`);
+    glow.addColorStop(0.45, `rgba(${tier.rgb}, ${0.12 + 0.1 * pulse})`);
+    glow.addColorStop(1, `rgba(${tier.rgb}, 0)`);
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.shadowColor = tier.color;
+    ctx.shadowBlur = target.r * (0.5 + 0.6 * pulse);
+    drawSprite(ctx, sprites.treasure, target.x, target.y, target.r * 2, 0, 1);
+    ctx.restore();
+
+    if (tier.key === 'none' && state === 'chest') {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(214, 218, 222, .92)';
+      ctx.font = `700 ${S * 0.045}px system-ui, sans-serif`;
+      ctx.fillText('BELOW THRESHOLD', target.x, target.y + target.r * 1.35);
+      ctx.fillStyle = 'rgba(180, 186, 192, .9)';
+      ctx.font = `600 ${S * 0.038}px system-ui, sans-serif`;
+      ctx.fillText(`SCORE ${score} / ${kiosk.threshold}`, target.x, target.y + target.r * 1.35 + S * 0.06);
+    }
+  }
+
+  function drawReveal() {
+    const tier = chest.tier;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, .6)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = tier.color;
+    ctx.shadowBlur = S * 0.08;
+    ctx.fillStyle = tier.color;
+    ctx.font = `900 ${S * 0.13}px system-ui, sans-serif`;
+    ctx.fillText(tier.label, W / 2, H * 0.44);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff';
+    ctx.font = `700 ${S * 0.055}px system-ui, sans-serif`;
+    ctx.fillText(
+      tier.key === 'none' ? `SCORE ${score} / ${kiosk.threshold}` : 'PRIZE',
+      W / 2,
+      H * 0.57
+    );
+    ctx.restore();
+  }
+
   function draw() {
     ctx.clearRect(0, 0, W, H);
 
@@ -395,6 +515,8 @@ import { CONFIG } from './config.js';
       ctx.stroke();
     }
 
+    if (chest && (state === 'chest' || state === 'reveal')) drawChest();
+
     const trails = SWORD
       ? [{ trail, hue: null }]
       : [...pointers.values()].map(p => ({ trail: p.trail, hue: p.hue }));
@@ -431,6 +553,8 @@ import { CONFIG } from './config.js';
 
     ctx.restore();
 
+    if (state === 'reveal' && chest) drawReveal();
+
     if (state === 'playing' && timeLeft <= 10) {
       const urgency = 1 - timeLeft / 10;
       const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 140);
@@ -456,6 +580,8 @@ import { CONFIG } from './config.js';
     cutFlashes = [];
     shake = 0;
     trail = [];
+    chest = null;
+    revealedAt = 0;
     spawnIn = CFG.spawn.startDelay;
     pointers.clear();
     startTrack.clear();
@@ -479,11 +605,42 @@ import { CONFIG } from './config.js';
     trail = [];
     pointers.clear();
     if (document.pointerLockElement) document.exitPointerLock();
+
+    if (KIOSK) {
+      const tier = score >= kiosk.threshold ? pickTier() : null;
+      beginChest(tier || NO_PRIZE);
+      return;
+    }
+
     showBoard();
+  }
+
+  function beginChest(tier) {
+    state = 'chest';
+    chest = { tier };
+    revealedAt = 0;
+    trail = [];
+    pointers.clear();
+    startTrack.clear();
+  }
+
+  function sliceChest() {
+    if (state !== 'chest' || !chest) return;
+    const target = chestTarget();
+    state = 'reveal';
+    revealedAt = performance.now();
+    burst({ x: target.x, y: target.y, r: target.r }, chest.tier.key);
+    addCutFlash(target.x, target.y, Math.random() * Math.PI, target.r);
+    if (chest.tier.key !== 'none') flashScreen();
+    playSound(SLASH_AUDIO[(Math.random() * SLASH_AUDIO.length) | 0]);
+    trail = [];
+    pointers.clear();
   }
 
   function resetToReady() {
     state = 'ready';
+    chest = null;
+    revealedAt = 0;
     score = 0;
     comboProgress = 0;
     comboTimer = 0;
@@ -773,6 +930,7 @@ import { CONFIG } from './config.js';
     comboLabel.textContent = `x${tier}`;
     comboMeter.classList.toggle('maxed', tier === CFG.combo.max);
     scoreEl.textContent = score;
+    if (state === 'reveal' && now - revealedAt > 3500) resetToReady();
     trail = trail.filter(p => now - p.t < 120);
     for (const ptr of pointers.values()) ptr.trail = ptr.trail.filter(p => now - p.t < 120);
     draw();
@@ -852,6 +1010,17 @@ import { CONFIG } from './config.js';
       return;
     }
 
+    if (state === 'chest') {
+      const target = chestTarget();
+      if (Math.hypot(p.x - target.x, p.y - target.y) <= target.r) {
+        sliceChest();
+        return;
+      }
+      pointers.set(e.pointerId, { x: p.x, y: p.y, hue: (e.pointerId * 67) % 360, trail: [{ ...p, t: performance.now() }] });
+      canvas.setPointerCapture?.(e.pointerId);
+      return;
+    }
+
     if (SWORD) {
       trail = [{ ...p, t: performance.now() }];
       return;
@@ -875,6 +1044,19 @@ import { CONFIG } from './config.js';
       }
       return;
     }
+
+    if (state === 'chest') {
+      const ptr = pointers.get(e.pointerId);
+      if (!ptr) return;
+      const p = localPoint(e);
+      ptr.trail.push({ ...p, t: performance.now() });
+      const target = chestTarget();
+      if (segmentHitsCircle(ptr.x, ptr.y, p.x, p.y, target.x, target.y, target.r)) sliceChest();
+      ptr.x = p.x;
+      ptr.y = p.y;
+      return;
+    }
+
     if (state !== 'playing') return;
 
     if (SWORD) {
@@ -950,6 +1132,14 @@ import { CONFIG } from './config.js';
   console.assert(segmentHitsCircle(0, 0, 100, 0, 50, 10, 20), 'segment should hit circle');
   console.assert(!segmentHitsCircle(0, 0, 100, 0, 50, 40, 20), 'segment should miss circle');
   console.assert(Math.abs(Math.atan2(0, 100)) < 1e-9, 'horizontal cut angle should be 0');
+
+  console.assert(positive('5') === 5 && positive(-1) === 0 && positive('oops') === 0, 'odds must sanitise to non-negative numbers');
+  const savedWeights = { ...kiosk.weights };
+  kiosk.weights = { common: 0, rare: 0, epic: 0, unique: 0 };
+  console.assert(pickTier() === null, 'all-zero odds must draw nothing');
+  kiosk.weights = { common: 0, rare: 0, epic: 0, unique: 1 };
+  console.assert(pickTier()?.key === 'unique', 'only the weighted tier can be drawn');
+  kiosk.weights = savedWeights;
 
   resize();
   requestAnimationFrame(frame);

@@ -41,10 +41,14 @@ body {
   isolation: isolate;
   background-color: #0b080c;
   background-image:
-    radial-gradient(ellipse at 50% 52%, transparent 32%, rgba(3, 2, 5, .78) 100%),
+    radial-gradient(ellipse at 50% 52%, transparent 30%, rgba(3, 2, 5, .85) 100%),
     radial-gradient(ellipse at 68% 112%, rgba(122, 30, 22, .3), transparent 58%),
     radial-gradient(ellipse at 32% 24%, rgba(140, 104, 58, .24), transparent 52%),
-    linear-gradient(165deg, #0b080c, #161016 52%, #09070b);
+    linear-gradient(rgba(5, 4, 7, .45), rgba(5, 4, 7, .68)),
+    url("assets/images/gamebackground.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
   box-shadow: 0 0 0 1px #ffb35c14, 0 10px 40px #0008;
 }
 
@@ -250,6 +254,16 @@ canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block
 }
 
 #overlay small img { height: 1.1em; vertical-align: -0.18em; }
+
+#kiosk-target {
+  display: block;
+  margin-top: 1vmin;
+  color: #ffd400;
+  font-size: 3.4vmin;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-shadow: 0 0 2vmin #ffd40066, 0 2px 8px #000;
+}
 
 #start-pumpkin {
   display: block;

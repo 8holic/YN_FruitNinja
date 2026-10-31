@@ -3,10 +3,12 @@ import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/1
 import {
   addDoc,
   collection,
+  doc,
   getCountFromServer,
   getDocs,
   getFirestore,
   limit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -17,6 +19,14 @@ import { CONFIG } from './config.js';
 const app = initializeApp(CONFIG.firebase);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+export function watchKioskSettings(onData, onError) {
+  return onSnapshot(
+    doc(db, 'settings', 'kiosk'),
+    snapshot => onData(snapshot.exists() ? snapshot.data() : null),
+    error => onError?.(error)
+  );
+}
 
 export async function getTopScores(count = 10) {
   const scores = query(collection(db, 'scores'), orderBy('score', 'desc'), limit(count));

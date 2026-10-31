@@ -1,5 +1,10 @@
 export const CONFIG = {
-  duration: 60,
+  duration: 3,
+
+  kiosk: {
+    threshold: 120,
+    weights: { common: 100, rare: 50, epic: 10, unique: 1 }
+  },
 
   firebase: {
     apiKey: 'AIzaSyCdbK0OqFeUTRlUJyng-6KWvBMPIUleL7Q',
@@ -11,7 +16,7 @@ export const CONFIG = {
   },
 
   points: {
-    fruit: 6,
+    fruit: 6000,
     high: 12,
     bomb: -9
   },
@@ -68,7 +73,8 @@ export const CONFIG = {
     sprites: {
       fruit: 'assets/images/medpoint.png',
       high: 'assets/images/highpoint.png',
-      bomb: 'assets/images/minuspoint.png'
+      bomb: 'assets/images/minuspoint.png',
+      treasure: 'assets/images/treasure.png'
     },
     slashAudio: [
       'assets/mp3/cut-through-the-air.mp3',
