@@ -1,5 +1,5 @@
 export const CONFIG = {
-  duration: 3,
+  duration: 60,
 
   kiosk: {
     threshold: 120,
@@ -16,7 +16,7 @@ export const CONFIG = {
   },
 
   points: {
-    fruit: 6000,
+    fruit: 6,
     high: 12,
     bomb: -9
   },
