@@ -43,7 +43,8 @@ import { CONFIG } from './config.js';
     audio.preload = 'auto';
     return audio;
   });
-  const EXPLOSION_AUDIO = new Audio(CFG.assets.explosionAudio);
+  const SCREAM_AUDIO = new Audio(CFG.assets.screamAudio);
+  let lastScreamAt = 0; // ponytail: 150ms gate so a multi-skeleton swipe is one shriek
   const JUICE_COLORS = {
     fruit: ['#ff9a2e', '#ffbf5a', '#e06b16', '#a33d12'],
     high: ['#ffd36b', '#ff9a2e', '#ff6b2e', '#c94c14'],
@@ -376,7 +377,11 @@ import { CONFIG } from './config.js';
           burst(f, 'bomb');
           addPopup(f.x, f.y, `${f.points}`, '#ff6b5a');
           flashScreen();
-          playSound(EXPLOSION_AUDIO);
+          const screamAt = performance.now();
+          if (screamAt - lastScreamAt > 150) {
+            lastScreamAt = screamAt;
+            playSound(SCREAM_AUDIO);
+          }
         } else {
           const multiplier = comboMultiplier();
           const gained = f.points * multiplier;

@@ -86,6 +86,6 @@ export const CONFIG = {
       'assets/mp3/slashed-with-a-sword-and-gushing-blood.mp3',
       'assets/mp3/strong-swing-and-cut-in-half.mp3'
     ],
-    explosionAudio: 'assets/mp3/explosion.mp3'
+    screamAudio: 'assets/mp3/scaryscream.m4a'
   }
 };
