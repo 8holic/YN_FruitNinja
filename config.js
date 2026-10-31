@@ -6,6 +6,11 @@ export const CONFIG = {
     weights: { common: 100, rare: 50, epic: 10, unique: 1 }
   },
 
+  kiosk2: {
+    threshold: 3000,
+    weights: { common: 70, rare: 20, epic: 8, unique: 2 }
+  },
+
   firebase: {
     apiKey: 'AIzaSyCdbK0OqFeUTRlUJyng-6KWvBMPIUleL7Q',
     authDomain: 'yn-fruitninja-db.firebaseapp.com',

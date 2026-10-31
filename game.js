@@ -9,7 +9,8 @@ import { CONFIG } from './config.js';
   const SWORD = params.has('sword');
   const SWORD_SENS = Math.max(0.1, Math.min(2, Number(params.get('sens')) || CFG.sword.sensitivity));
   const SWAP_AXES = params.has('swap');
-  const KIOSK = params.has('kiosk');
+  const KIOSK2 = params.has('kiosk2');
+  const KIOSK = params.has('kiosk') || KIOSK2;
   const sprites = {};
 
   const TIERS = [
@@ -20,10 +21,9 @@ import { CONFIG } from './config.js';
   ];
   const NO_PRIZE = { key: 'none', label: 'NO PRIZE', color: '#9aa0a6', rgb: '154,160,166' };
 
-  const kiosk = {
-    threshold: CFG.kiosk.threshold,
-    weights: { ...CFG.kiosk.weights }
-  };
+  const kiosk = KIOSK2
+    ? { threshold: CFG.kiosk2.threshold, weights: { ...CFG.kiosk2.weights } }
+    : { threshold: CFG.kiosk.threshold, weights: { ...CFG.kiosk.weights } };
 
   for (const [kind, src] of Object.entries(CFG.assets.sprites)) {
     const img = new Image();
@@ -121,9 +121,11 @@ import { CONFIG } from './config.js';
     kioskTarget.id = 'kiosk-target';
     overlay.querySelector('.start-title').after(kioskTarget);
     updateKioskTarget();
-    loadFirebase()
-      .then(({ watchKioskSettings }) => watchKioskSettings(applyKioskSettings))
-      .catch(() => {});
+    if (!KIOSK2) {
+      loadFirebase()
+        .then(({ watchKioskSettings }) => watchKioskSettings(applyKioskSettings))
+        .catch(() => {});
+    }
   }
 
   function positive(value) {
@@ -426,17 +428,19 @@ import { CONFIG } from './config.js';
   function drawChest() {
     const target = chestTarget();
     const tier = chest.tier;
+    const hidden = tier.key !== 'none' && state === 'chest';
+    const shown = hidden ? { color: '#cfe3f2', rgb: '207,227,242' } : tier;
     const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 220);
 
     const glow = ctx.createRadialGradient(target.x, target.y, 0, target.x, target.y, target.r * 2.4);
-    glow.addColorStop(0, `rgba(${tier.rgb}, ${0.28 + 0.22 * pulse})`);
-    glow.addColorStop(0.45, `rgba(${tier.rgb}, ${0.12 + 0.1 * pulse})`);
-    glow.addColorStop(1, `rgba(${tier.rgb}, 0)`);
+    glow.addColorStop(0, `rgba(${shown.rgb}, ${0.28 + 0.22 * pulse})`);
+    glow.addColorStop(0.45, `rgba(${shown.rgb}, ${0.12 + 0.1 * pulse})`);
+    glow.addColorStop(1, `rgba(${shown.rgb}, 0)`);
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, W, H);
 
     ctx.save();
-    ctx.shadowColor = tier.color;
+    ctx.shadowColor = shown.color;
     ctx.shadowBlur = target.r * (0.5 + 0.6 * pulse);
     drawSprite(ctx, sprites.treasure, target.x, target.y, target.r * 2, 0, 1);
     ctx.restore();
@@ -930,7 +934,6 @@ import { CONFIG } from './config.js';
     comboLabel.textContent = `x${tier}`;
     comboMeter.classList.toggle('maxed', tier === CFG.combo.max);
     scoreEl.textContent = score;
-    if (state === 'reveal' && now - revealedAt > 3500) resetToReady();
     trail = trail.filter(p => now - p.t < 120);
     for (const ptr of pointers.values()) ptr.trail = ptr.trail.filter(p => now - p.t < 120);
     draw();
@@ -1007,6 +1010,11 @@ import { CONFIG } from './config.js';
       if (target && Math.hypot(p.x - target.x, p.y - target.y) <= target.r) {
         beginFromPoint(e, p.x, p.y, Math.random() * Math.PI);
       }
+      return;
+    }
+
+    if (state === 'reveal') {
+      if (performance.now() - revealedAt >= 2500) resetToReady();
       return;
     }
 

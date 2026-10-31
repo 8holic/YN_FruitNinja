@@ -58,7 +58,7 @@
       } catch {}
     }
 
-    if (new URLSearchParams(location.search).has('kiosk')) {
+    if (new URLSearchParams(location.search).has('kiosk') || new URLSearchParams(location.search).has('kiosk2')) {
       const fsBtn = document.createElement('button');
       fsBtn.id = 'fs';
       fsBtn.textContent = 'F';
